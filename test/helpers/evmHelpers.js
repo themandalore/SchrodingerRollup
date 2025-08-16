@@ -1,11 +1,11 @@
 const web3 = require('web3');
 const { ethers, network } = require("hardhat");
-const hash = ethers.utils.keccak256;
+const hash = ethers.ukeccak256;
 var assert = require('assert');
 const { impersonateAccount, takeSnapshot } = require("@nomicfoundation/hardhat-network-helpers");
 
 var assert = require('assert');
-const abiCoder = new ethers.utils.AbiCoder();
+const abiCoder = new ethers.AbiCoder();
 
 advanceTimeAndBlock = async (time) => {
   await advanceTime(time);
@@ -212,8 +212,9 @@ getCurrentAggregateReport = (_queryId, _value, _timestamp,_reporterPower) => {
 
 layerSign = (message, privateKey) => {
   // assumes message is bytesLike
-  messageHash = ethers.utils.sha256(message)
-  signingKey = new ethers.utils.SigningKey(privateKey)
+  messageHash = ethers.sha256(message)
+  signingKey = new ethers.SigningKey(privateKey)
+  console.log(signingKey)
   signature = signingKey.signDigest(messageHash)
   return signature
 }
