@@ -1,77 +1,77 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import {ECDSA} from "./ECDSA.sol";
-import "./Constants.sol";
+import "./Oracle.sol";
 
-/*
-TODO
-Add pretty comments
-Make video presentation
-  - draw out diagram of multiple forks to explain
-write working test
-Add validation
-add events
-Have way to transfer to and from rollup with assets
-*/
+// /*
+// TODO
+// Make video presentation
+//   - draw out diagram of multiple forks to explain
+// Write validating Bridge 
+// Make node 
+// */
 
-contract SchrodingerRollup  is ECDSA {
-  address public sequencer;
+/// @title SchrodingerRollup
+/// @dev This is an minimum-viable POA rollup
+// its part based-rollup, part-trusted sequencer, but that's not the cool thing
+// the cool piece of the rollup is that it forks the chain if there is a disagreement in the oracle price
+// it keeps 2 potential rollup states for a while and then will later settle the chain
+contract SchrodingerRollup{
+  Oracle public oracle;
   uint256 public constant settlementTime = 1 minutes;
   uint256 public constant deviationThreshold = 5;//percent threshold to kick off a fork
   uint256 public rollupBlockNumber;
   uint256 public lastFinalBlockTime;
   uint256 public lastFinalBlockNumber;
-  bytes[][] public allHashes;
+  bytes[] public allTxns;
   uint256[] public prices;
   uint256 public forks;
 
-  struct Signature {
-    uint8 v;
-    bytes32 r;
-    bytes32 s;
-  }
 
-  error InvalidSignature();
   mapping(uint256 => uint256[3]) savedOraclePrices;//fork to prices,timestamp for comparison
-  mapping(uint256 => mapping(bool => bytes[][])) hashesByFork;//you save all the hashes in each side of the fork.
+  mapping(uint256 => mapping(bool => bytes[])) txnsByFork;//you save all the hashes in each side of the fork.
   mapping(uint256 => mapping(bool => uint256[])) pricesByFork;//you save all the hashes in each side of the fork.
   //if the final level agrees on a price or it's been past X blocks, you can merge them. 
 
+    event DataPosted(bytes _calldata,uint256 _fastOracle,uint256 _slowOracle);
+    event ForkInitiated(uint256 _rollupBlockNumber,uint256 _forks, uint256 _fastOracle,uint256 _slowOracle);
+    event ForkClosed(uint256 _openForks);
 
-  constructor(address _sequencer){
-    sequencer = _sequencer;
+  constructor(address _oracle){
+    oracle = Oracle(_oracle);
   }
 
-  function postBlob(bytes[] memory _txns,bytes[] calldata _sigs,address[] memory _addys, uint256 _fastOracle, uint256 _slowOracle) external{
-    require(msg.sender == sequencer);
+  function postBlob(bytes calldata _calldata) external{
+    (uint256 _fastOracle, uint256 _slowOracle) = oracle.getPrices();
     if(_isWithinRange(_fastOracle,_slowOracle)){
       prices.push(_fastOracle);
       if(forks >0){
         uint256[3] memory _forkData;
-        bytes[][] memory _forkTxns;
+        bytes[] memory _forkTxns;
         uint256[] memory _forkPrices;
         for(uint _f = forks;_f>0;_f--){
           _forkData = savedOraclePrices[_f];
           if(block.timestamp - _forkData[2] >= settlementTime){//must wait settlement time
             if(_isCloserA(_fastOracle,_forkData[1],_forkData[2])){//if it's closer to a
-              _forkTxns = hashesByFork[_f][true];
+              _forkTxns = txnsByFork[_f][true];
               _forkPrices = pricesByFork[_f][true];
             }
             else{
-              _forkTxns = hashesByFork[_f][false];
+              _forkTxns = txnsByFork[_f][false];
               _forkPrices = pricesByFork[_f][false];
             }
             for(uint256 _l = 0;_l < _forkTxns.length;_l++){
                 if(_f == 1){
-                  allHashes.push(_forkTxns[_l]);
+                  allTxns.push(_forkTxns[_l]);
                   prices.push(_forkPrices[_l]);
                 }
                 else{
-                  hashesByFork[_f -1][true].push(_forkTxns[_l]);
-                  hashesByFork[_f -1][false].push(_forkTxns[_l]);
+                  txnsByFork[_f -1][true].push(_forkTxns[_l]);
+                  txnsByFork[_f -1][false].push(_forkTxns[_l]);
                   pricesByFork[_f -1][true].push(_forkPrices[_l]);
                   pricesByFork[_f -1][false].push(_forkPrices[_l]);
+                  forks--;
+                  emit ForkClosed(forks);
                 }
               }
           }
@@ -83,19 +83,11 @@ contract SchrodingerRollup  is ECDSA {
     }
     else{
       forks++;
+      emit ForkInitiated(rollupBlockNumber, forks, _fastOracle, _slowOracle);
       savedOraclePrices[forks] = [_fastOracle,_slowOracle,block.timestamp];
     }
-    _storeTxns(_txns,_fastOracle,_slowOracle);
-    require(_addys.length == _sigs.length);
-    require(_addys.length == _txns.length);
-    bytes32 _digest;
-    for (uint256 _a = 0; _a < _addys.length; _a++) {
-            // Check that the current validator has signed off on the hash.
-            _digest = keccak256(abi.encode(_txns[_a]));
-            if (!_verifySig(_addys[_a], _digest, _sigs[_a])) {
-                revert InvalidSignature();
-            }
-        }
+    _storeTxns(_calldata,_fastOracle,_slowOracle);
+    emit DataPosted(_calldata, _fastOracle, _slowOracle);
   }
 
   function _isCloserA(uint256 _comp,uint256 _a,uint _b) internal pure returns(bool){
@@ -119,22 +111,22 @@ contract SchrodingerRollup  is ECDSA {
     return false;
   }
 
-  function _storeTxns(bytes[] memory _txns, uint256 _fast, uint256 _slow) internal{
+  function _storeTxns(bytes memory _calldata, uint256 _fast, uint256 _slow) internal{
     if(forks > 0){
-        hashesByFork[forks][true].push(_txns);
-        hashesByFork[forks][false].push(_txns);
+        txnsByFork[forks][true].push(_calldata);
+        txnsByFork[forks][false].push(_calldata);
         pricesByFork[forks][true].push(_fast);
         pricesByFork[forks][false].push(_slow);
     }
     else{
-      allHashes.push(_txns);
+      allTxns.push(_calldata);
       rollupBlockNumber++;
       lastFinalBlockTime = block.timestamp;
       lastFinalBlockNumber = rollupBlockNumber;
     }
   }
 
-  function _isWithinRange(uint256 _fast, uint256 _slow) public view returns(bool){
+  function _isWithinRange(uint256 _fast, uint256 _slow) public pure returns(bool){
     if(_fast == _slow){
       return true;
     }
@@ -146,41 +138,7 @@ contract SchrodingerRollup  is ECDSA {
     }
   }
 
-    /// @notice Utility function to verify Tellor Layer signatures
-    /// @param _signer The address that signed the message.
-    /// @param _digest The digest that was signed.
-    /// @param _sig The signature.
-    /// @return bool True if the signature is valid.
-    function _verifySig(
-        address _signer,
-        bytes32 _digest,
-        bytes memory _sig
-    ) internal pure returns (bool) {
-        require(_sig.length == 65, "Signature length is wrong !");
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-        assembly {
-            // first 32 bytes, after the length prefix.
-            r := mload(add(_sig, 32))
-            // second 32 bytes.
-            s := mload(add(_sig, 64))
-            // final byte (first byte of the next 32 bytes).
-            v := byte(0, mload(add(_sig, 96)))
-        }
-        // (address _recovered, RecoverError error, ) = tryRecover(toEthSignedMessageHash(_digest), v, r, s);
-        // if (error != RecoverError.NoError) {
-        //     revert InvalidSignature();
-        // }
-        // return _signer == _recovered;
-        return true;
-    }
-
-    function getTxnsByBlock(uint256 _a) external view returns(bytes[] memory){
-      return allHashes[_a];
+    function getTxnByBlock(uint256 _a) external view returns(bytes memory){
+      return allTxns[_a];
     }
 }
-
-  //do we need this?
-  // function _verifyTransactions(){
-  // }
