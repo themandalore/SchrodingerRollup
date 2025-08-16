@@ -47,4 +47,5 @@ npx hardhat test
 #### Inspiration 
 
 ["Ambiguous State Machines"](https://arxiv.org/pdf/2503.14631) by Matt Stephenson
+
 Youtube Video - [Veiled Oracles: A fair, liveness preserving method for enshrined information feeds] (https://www.youtube.com/watch?v=amdq1oVJ1C8)
