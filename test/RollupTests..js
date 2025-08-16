@@ -1,5 +1,4 @@
 const { expect } = require("chai");
-const h = require("./helpers/evmHelpers");
 
 let vals, users, rollup, accounts, oracle;
 
