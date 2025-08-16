@@ -1,73 +1,77 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-// Uncomment this line to use console.log
-// import "hardhat/console.sol";
+/*
+TODO
+Add pretty comments
+Make video presentation
+  - draw out diagram of multiple forks to explain
+write working test
+Add validation
+Have way to transfer to and from rollup with assets
+*/
 
 contract SchrodingerRollup {
-  
-  uint256 settlementTime = 1 minutes;
-  uint256 deviationThreshold = 5;//percent threshold to kick off a fork
-  bytes32 currentHash;
-  uint256 lastFinalBlock;
-  bytes32[] allHashes;
-  uint256[] prices;
-
-  uint256 forks;
+  uint256 public constant settlementTime = 1 minutes;
+  uint256 public constant deviationThreshold = 5;//percent threshold to kick off a fork
+  uint256 public rollupBlockNumber;
+  uint256 public lastFinalBlock;
+  bytes[][] public allHashes;
+  uint256[] public prices;
+  uint256 public forks;
   mapping(uint256 => uint256[3]) savedOraclePrices;//fork to prices,timestamp for comparison
-  mapping(uint256 => mapping(bool => bytes32[])) hashesByFork;//you save all the hashes in each side of the fork.
+  mapping(uint256 => mapping(bool => bytes[][])) hashesByFork;//you save all the hashes in each side of the fork.
   //if the final level agrees on a price or it's been past X blocks, you can merge them. 
-  constructor{
-    forks = 0;
-  }
+
+
   function postBlob(bytes[] memory _txns,uint256 _fastOracle, uint256 _slowOracle) external{
     if(_isWithinRange(_fastOracle,_slowOracle)){
       prices.push(_fastOracle);
       if(forks >0){
-        uint256[3] _forkData;
-        bytes32[] _forkTxns;
+        uint256[3] memory _forkData;
+        bytes[][] memory _forkTxns;
         for(uint _f = forks;_f>0;_f--){
           _forkData = savedOraclePrices[_f];
           if(block.timestamp - _forkData[2] >= settlementTime){//must wait settlement time
-            if(_isCloserA(_fastData,_forkData[1],_forkData[2])){//if it's closer to a
-              _forkTxns = hashesByFork[f,true];
+            if(_isCloserA(_fastOracle,_forkData[1],_forkData[2])){//if it's closer to a
+              _forkTxns = hashesByFork[_f][true];
             }
             else{
-              _forkTxns = hashesByFork[f,false];
+              _forkTxns = hashesByFork[_f][false];
             }
-              for(uint256 _l = 0,l < _forkTxns.length,_l++){
-                if(_f = 1){
-                  currentHash.push(_forkTxns[_l])
+            for(uint256 _l = 0;_l < _forkTxns.length;_l++){
+                if(_f == 1){
+                  allHashes.push(_forkTxns[_l]);
                 }
                 else{
-                  hashesByFork[f -1,true].push(_forkTxns[_l])
-                  hashesByFork[f -1,false].push(_forkTxns[_l])
+                  hashesByFork[_f -1][true].push(_forkTxns[_l]);
+                  hashesByFork[_f -1][false].push(_forkTxns[_l]);
                 }
               }
           }
           else{
-            break;//just keep adding if not settled
+            break;//stop the close out if not settled
           }
         }
       }
     }
-    else if{
+    else{
       forks++;
-      savedOraclePrices[_forks] = [_fastOracle,_slowOracle,block.timestamp];
+      savedOraclePrices[forks] = [_fastOracle,_slowOracle,block.timestamp];
     }
-    _storeTxns(_txns, _fastOracle, _slowOracle);
+    _storeTxns(_txns);
   }
 
-  function _isCloserA(uint256 _comp,uint256 _a,uint _b) returns(bool){
+  function _isCloserA(uint256 _comp,uint256 _a,uint _b) internal pure returns(bool){
     uint _c1;
     uint _c2;
-    if(_comp >= a){
+    if(_comp >= _a){
       _c1 = _comp - _a;
     }
     else{
       _c1 = _a - _comp;
     }
-    if(_comp >= b){
+    if(_comp >= _b){
       _c2 = _comp - _b;
     }
     else{
@@ -79,19 +83,19 @@ contract SchrodingerRollup {
     return false;
   }
 
-  function _storeTxns(bytes[] memory _txns, _fast, _slow){
+  function _storeTxns(bytes[] memory _txns) internal{
     if(forks > 0){
-        hashesByFork[forks,true].push(_txns)
-        hashesByFork[forks,false].push(_txns);
+        hashesByFork[forks][true].push(_txns);
+        hashesByFork[forks][false].push(_txns);
     }
     else{
       allHashes.push(_txns);
-      currentHash = keccak256(_txns);
+      rollupBlockNumber++;
       lastFinalBlock = block.timestamp;
     }
   }
 
-  function _isWithinRange(uint256 _fast, uint256 _slow) returns(bool){
+  function _isWithinRange(uint256 _fast, uint256 _slow) internal view returns(bool){
     if(_fast > _slow){
       return ((_fast*1000000 - _slow*1000000)/ _slow * 1000000)> deviationThreshold;
     }
@@ -101,7 +105,7 @@ contract SchrodingerRollup {
   }
 
   //do we need this?
-  function _verifyTransactions(){
-  }
+  // function _verifyTransactions(){
+  // }
 
 }
