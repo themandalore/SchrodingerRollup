@@ -42,6 +42,21 @@ domainSeparateOracleAttestationData = (attestationData, valCheckpoint) => {
   return hash(enc)
 }
 
+postOnRollup = async (signedTx) => {
+  const requestOptions = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      "jsonrpc":"2.0",
+      "id":0,
+      "method":"eth_sendRawTransaction",
+      "params":[signedTx]
+    })
+  };
+  let receipt = await fetch(`http://127.0.0.1:8545/`, requestOptions);
+  console.log(`txn receipt`, receipt);
+}
+
 getValSetStructArray = (valAddrs, powers) => {
   structArray = []
   for (i = 0; i < valAddrs.length; i++) {

@@ -17,6 +17,20 @@ advanceTimeAndBlock = async (time) => {
 const takeFifteen = async () => {
   await advanceTime(60 * 18);
 };
+postOnRollup = async (signedTx) => {
+  const requestOptions = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      "jsonrpc":"2.0",
+      "id":0,
+      "method":"eth_sendRawTransaction",
+      "params":[signedTx]
+    })
+  };
+  let receipt = await fetch(`http://127.0.0.1:8545/`, requestOptions);
+  console.log(`txn receipt`, receipt);
+}
 
 advanceTime = async (time) => {
   await network.provider.send("evm_increaseTime", [time])
@@ -247,6 +261,7 @@ module.exports = {
   sleep,
   takeSnapshot,
   impersonateAccount,
-  layerSign
+  layerSign,
+  postOnRollup
 };
 

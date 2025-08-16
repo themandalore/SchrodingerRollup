@@ -1,4 +1,6 @@
 const { expect } = require("chai");
+const {bytecode} = require("../artifacts/contracts/TestToken.sol/TestToken.json");
+const h = require("./helpers/evmHelpers");
 
 let vals, users, rollup, accounts, oracle;
 
@@ -32,19 +34,34 @@ describe("Schrodinger's Rollup Tests", function () {
   describe("PostBlobs", function () {
     it("Should store txns", async function () {
       expect(await rollup._isWithinRange(100,100))
-      txns = "0x1234"
+
+      // encode the data from smart contract method
+      // const data = await myContract.methods
+      // .demoNow(randomNumber, handleId)
+      // .encodeABI();
+      console.log(vals[1].address)
+      // call the signTransaction
+        let signedTx = await vals[1].signTransaction({
+          from: vals[1].address,
+          to: null,
+          nonce: 0,
+          gasPrice: 10,
+          gasLimit: 5000000,
+          value: 0,
+          data: bytecode
+        });
+      console.log(signedTx)
       await oracle.connect(sequencer).updatePrices(100,100)
-      await rollup.connect(accounts[1]).postBlob(txns);
+      await rollup.connect(accounts[1]).postBlob(signedTx);
+
       expect(await rollup.forks()).to.equal(0);
       expect(await rollup.rollupBlockNumber()).to.equal(1);
       expect(await rollup.lastFinalBlockNumber()).to.equal(1);
       let hashes = await rollup.getTxnByBlock(0)
-      expect(await hashes  == txns)
+      expect(await hashes  == signedTx)
+      await h.postOnRollup(hashes);
       expect(await rollup.prices(0)).to.equal(100);
     });
-    // it("Should store proper price", async function () {
-    //   expect(1).to.equal(5);
-    // });
   });
   // describe("Handle Price Deviations -- Full Test", function () {
   //   it("Does 1 fork", async function () {
