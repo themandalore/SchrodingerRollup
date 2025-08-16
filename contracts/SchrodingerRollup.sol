@@ -3,6 +3,12 @@ pragma solidity 0.8.19;
 
 import "./Oracle.sol";
 
+//   _________      .__              .___.__                           /\        __________       .__  .__                
+//  /   _____/ ____ |  |_________  __| _/|__| ____    ____   __________)/ ______ \______   \ ____ |  | |  |  __ ________  
+//  \_____  \_/ ___\|  |  \_  __ \/ __ | |  |/    \  / ___\_/ __ \_  __ \/  ___/  |       _//  _ \|  | |  | |  |  \____ \ 
+//  /        \  \___|   Y  \  | \/ /_/ | |  |   |  \/ /_/  >  ___/|  | \/\___ \   |    |   (  <_> )  |_|  |_|  |  /  |_> >
+// /_______  /\___  >___|  /__|  \____ | |__|___|  /\___  / \___  >__|  /____  >  |____|_  /\____/|____/____/____/|   __/ 
+//         \/     \/     \/           \/         \//_____/      \/           \/          \/                       |__|
 /// @title SchrodingerRollup
 /// @dev This is an minimum-viable POA rollup
 // its part based-rollup, part-trusted sequencer, but that's not the cool thing
@@ -33,11 +39,11 @@ contract SchrodingerRollup{
     oracle = Oracle(_oracle);
   }
 
-    /**
-     * @dev allows anyone to post a txn to the DA Layer making a rollup block
-     * @param _signedTx a signedTx to be included on the rollup
-     * @param _forkChoice 0 if both, 1 if true, 2 if false
-     */
+  /**
+    * @dev allows anyone to post a txn to the DA Layer making a rollup block
+    * @param _signedTx a signedTx to be included on the rollup
+    * @param _forkChoice 0 if both, 1 if true, 2 if false
+    */
   function postBlob(bytes calldata _signedTx, uint8 _forkChoice) external{
     (uint256 _fastOracle, uint256 _slowOracle) = oracle.getPrices();
     if(_isWithinRange(_fastOracle,_slowOracle)){
