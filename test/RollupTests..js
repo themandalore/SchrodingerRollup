@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const h = require("./helpers/evmHelpers");
 
-let vals, users, rollup, accounts;
+let vals, users, rollup, accounts, oracle;
 
 describe("Schrodinger's Rollup Tests", function () {
   // We define a fixture to reuse the same setup in every test.
@@ -15,13 +15,16 @@ describe("Schrodinger's Rollup Tests", function () {
     val3 = ethers.Wallet.createRandom()
     vals = [val1,val2,val3]
     users = [val1.address, val2.address, val3.address]
+    const Oracle = await ethers.getContractFactory("Oracle");
+    oracle = await Oracle.deploy(sequencer.address);
     const ScrodingerRollup = await ethers.getContractFactory("SchrodingerRollup");
-    rollup = await ScrodingerRollup.deploy(sequencer.address);
+    rollup = await ScrodingerRollup.deploy(oracle.target);
   });
 
   describe("Deployment", function () {
     it("Should deploy correctly", async function () {
       expect(await rollup.forks()).to.equal(0);
+      expect(await rollup.oracle()).to.equal(oracle.target);
       expect(await rollup.settlementTime()).to.equal(60);
       expect(await rollup.deviationThreshold()).to.equal(5);
     });
@@ -30,23 +33,13 @@ describe("Schrodinger's Rollup Tests", function () {
   describe("PostBlobs", function () {
     it("Should store txns", async function () {
       expect(await rollup._isWithinRange(100,100))
-      sigs = []
-      txns = []
-      addys = []
-      let sig;
-      for(i=0;i<4;i++){
-        txns.push("0x1234")
-        _digest = ethers.sha256(txns[i])
-        sig = await accounts[i].signMessage(_digest);
-        //sig = await h.layerSign(txns[i], vals[i].privateKey)
-        sigs.push(sig)
-        addys.push(accounts[i].address)
-      }
-      await rollup.connect(sequencer).postBlob(txns,sigs,addys,100,100);
+      txns = "0x1234"
+      await oracle.connect(sequencer).updatePrices(100,100)
+      await rollup.connect(accounts[1]).postBlob(txns);
       expect(await rollup.forks()).to.equal(0);
       expect(await rollup.rollupBlockNumber()).to.equal(1);
       expect(await rollup.lastFinalBlockNumber()).to.equal(1);
-      let hashes = await rollup.getTxnsByBlock(0)
+      let hashes = await rollup.getTxnByBlock(0)
       expect(await hashes  == txns)
       expect(await rollup.prices(0)).to.equal(100);
     });

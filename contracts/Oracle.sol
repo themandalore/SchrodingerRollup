@@ -12,6 +12,8 @@ contract Oracle {
     address guardian;
     string constant asset = "TRB/USD";
 
+    event OracleUpdated(uint256 _fastPrice, uint256 _slowPrice);
+
     constructor(address _guardian){
         guardian = _guardian;
     }
@@ -21,9 +23,9 @@ contract Oracle {
     }
 
     function updatePrices(uint256 _fast, uint256 _slow) external{
-
         fastPrice = _fast;
         slowPrice = _slow;
+        emit OracleUpdated(_fast, _slow);
     }
 
 }
