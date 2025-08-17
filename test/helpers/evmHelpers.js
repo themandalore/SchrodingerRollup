@@ -29,7 +29,7 @@ postOnRollup = async (signedTx) => {
     })
   };
   let receipt = await fetch(`http://127.0.0.1:8545/`, requestOptions);
-  console.log(`txn receipt`, receipt);
+  //console.log(`txn receipt`, receipt);
 }
 
 advanceTime = async (time) => {

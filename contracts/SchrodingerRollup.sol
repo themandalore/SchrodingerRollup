@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import "./Oracle.sol";
+import "hardhat/console.sol";
 
 //   _________      .__              .___.__                           /\        __________       .__  .__                
 //  /   _____/ ____ |  |_________  __| _/|__| ____    ____   __________)/ ______ \______   \ ____ |  | |  |  __ ________  
@@ -19,7 +20,7 @@ contract SchrodingerRollup{
   uint256 public constant deviationThreshold = 5;//percent threshold to kick off a fork
   uint256 public constant settlementTime = 1 minutes;
   bytes[] public allTxns;
-  uint256 public forks;
+  uint256 public forks = 0;
   bool public isForked;
   uint256 public lastFinalBlockNumber;
   uint256 public lastFinalBlockTime;
@@ -27,9 +28,9 @@ contract SchrodingerRollup{
   uint256[] public prices;
   Oracle public oracle;
 
-  mapping(uint256 => uint256[3]) savedOraclePrices;//fork to prices,timestamp for comparison
-  mapping(uint256 => mapping(bool => bytes[])) txnsByFork;//you save all the hashes in each side of the fork.
-  mapping(uint256 => mapping(bool => uint256[])) pricesByFork;//you save all the hashes in each side of the fork.
+  mapping(uint256 => uint256[3]) public savedOraclePrices;//fork to prices,timestamp for comparison
+  mapping(uint256 => mapping(bool => bytes[])) public txnsByFork;//you save all the hashes in each side of the fork.
+  mapping(uint256 => mapping(bool => uint256[])) public pricesByFork;//you save all the hashes in each side of the fork.
 
   event DataPosted(bytes _signedTx,uint256 _fastOracle,uint256 _slowOracle);
   event ForkInitiated(uint256 _rollupBlockNumber,uint256 _forks, uint256 _fastOracle,uint256 _slowOracle);
@@ -47,6 +48,7 @@ contract SchrodingerRollup{
   function postBlob(bytes calldata _signedTx, uint8 _forkChoice) external{
     (uint256 _fastOracle, uint256 _slowOracle) = oracle.getPrices();
     if(_isWithinRange(_fastOracle,_slowOracle)){
+      console.log(51);
       prices.push(_fastOracle);
       if(isForked){
         uint256[3] memory _forkData;
@@ -68,11 +70,10 @@ contract SchrodingerRollup{
               }
           }
       }
-    }
-    else{
+    }else{
       if(!isForked){
         isForked = true;
-        forks++;
+        forks+=1;
         emit ForkInitiated(rollupBlockNumber, forks, _fastOracle, _slowOracle);
         savedOraclePrices[forks] = [_fastOracle,_slowOracle,block.timestamp];
       }
@@ -126,14 +127,18 @@ contract SchrodingerRollup{
       return true;
     }
     if(_fast > _slow){
-      return ((_fast*1000000 - _slow*1000000)/ _slow * 1000000)> deviationThreshold;
+      return ((_fast*1000000 - _slow*1000000)/ (_slow * 1000000))> deviationThreshold;
     }
     else{
-      return ((_slow*1000000 - _fast*1000000)/ _slow * 1000000)> deviationThreshold;
+      return ((_slow*1000000 - _fast*1000000)/ (_slow * 1000000))> deviationThreshold;
     }
   }
 
     function getTxnByBlock(uint256 _a) external view returns(bytes memory){
       return allTxns[_a];
+    }
+
+        function getSavedOraclePrices(uint256 _a) external view returns(uint[3] memory){
+      return savedOraclePrices[_a];
     }
 }
