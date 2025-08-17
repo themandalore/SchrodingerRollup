@@ -48,7 +48,6 @@ contract SchrodingerRollup{
   function postBlob(bytes calldata _signedTx, uint8 _forkChoice) external{
     (uint256 _fastOracle, uint256 _slowOracle) = oracle.getPrices();
     if(_isWithinRange(_fastOracle,_slowOracle)){
-      console.log(51);
       prices.push(_fastOracle);
       if(isForked){
         uint256[3] memory _forkData;

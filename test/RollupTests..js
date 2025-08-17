@@ -61,13 +61,20 @@ describe("Schrodinger's Rollup Tests", function () {
       //encode the data from smart contract method
       const abi = [
         "function mint(address account, uint amount) returns(bool)",
+        "function transfer(address to, uint amount) returns(bool)",
+        "function burn(address account, uint amount) returns(bool)",
       ];
       const provider = ethers.getDefaultProvider();
       const contract = new ethers.Contract(testToken.target, abi, provider);
       const action = 'mint'
-      const params = [accounts[1].address,100]
-      const method = contract.getFunction(action)
-      const _data = await method.populateTransaction(...params)
+      const tAction = 'transfer'
+      const bAction = 'burn'
+      let methods = []
+      methods.push(contract.getFunction(action))
+      methods.push(contract.getFunction(tAction))
+      methods.push(contract.getFunction(bAction))
+      let params = [accounts[1].address,100]
+      let _data = await methods[0].populateTransaction(...params)
       // call the signTransaction
         let signedTx = await vals[1].signTransaction({
           from: vals[1].address,
@@ -77,6 +84,7 @@ describe("Schrodinger's Rollup Tests", function () {
           value: 0,
           data:_data.data
         });
+        console.log("updating oracle")
       await oracle.connect(sequencer).updatePrices(50,100)
       expect(await rollup._isWithinRange(50,100) == false)
       await rollup.connect(accounts[1]).postBlob(signedTx,0);
@@ -86,7 +94,26 @@ describe("Schrodinger's Rollup Tests", function () {
       expect(await rollup.lastFinalBlockNumber()).to.equal(1);
       let hashes = await rollup.getTxnByBlock(0)
       expect(await hashes  == signedTx)
-      await h.postOnRollup(hashes);
+      console.log("Posting lots of data")
+      let mod;
+      for(let i=0;i<200;i++){
+        mod = i % 3;
+        await new Promise(r => setTimeout(r, 150));
+        let params = [accounts[1].address,1000 * i]
+        let _data = await methods[mod].populateTransaction(...params)
+        // call the signTransaction
+          signedTx = await vals[1].signTransaction({
+            from: vals[1].address,
+            to: testToken.target,
+            gasPrice: i,
+            gasLimit: 5000000,
+            value: 0,
+            data:_data.data
+          });
+
+        await h.postOnRollup(signedTx);
+      }
+
       expect(await rollup.prices(0)).to.equal(100);
       let savedPrices = await rollup.getSavedOraclePrices(1)
       expect(savedPrices[0]).to.equal(50)
